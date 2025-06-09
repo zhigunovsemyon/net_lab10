@@ -28,7 +28,6 @@ int main()
 		perror("Failed to open sock");
 		return 1;
 	}
-	printf("Серверный сокет: %d\n", serv_sock);
 
 	// Соединение сокета с портом и адресом
 	if (bind(serv_sock, (struct sockaddr const *)&server_addr,
@@ -45,8 +44,6 @@ int main()
 		return 1;
 	}
 
-	// printf("Клиентский порт: %d\n", )
-
 	// Структура с адресом и портом клиента
 	struct sockaddr_in client_addr;
 	socklen_t client_addr_len;
@@ -58,11 +55,9 @@ int main()
 		close(serv_sock);
 		return 1;
 	}
-	printf("Клиентский сокет: %d\n", client_sock);
 
-
-	ssize_t recv_ret;
 	do {
+		ssize_t recv_ret;
 		char buf[17];
 		buf[16] = '\0';
 
@@ -75,10 +70,10 @@ int main()
 		}
 		if(recv_ret == 0)
 			break;
+		buf[recv_ret] = '\0';
 
+		printf("recv_ret = %ld;", recv_ret);
 		printf("%s|\n", buf);
-
-
 	} while (true);
 
 	close(serv_sock);
