@@ -9,46 +9,36 @@
  * 7. Определить параметры соединения – номера портов с обеих сторон.
  */
 
+// Файловый дескриптор
 typedef int fd_t;
 
 constexpr in_port_t PORT = 8789;
-constexpr uint32_t LOCALHOST = (127 << 24) + 1;
+// constexpr uint32_t LOCALHOST = (127 << 24) + 1;
 
 int read_cycle(fd_t fd);
 
+fd_t create_bind_server_socket(struct sockaddr_in const * ip_info);
+
+void print_client_info(struct sockaddr_in const * client);
+
 int main()
 {
+	// Структура с адресом и портом клиента
+	struct sockaddr_in client_addr;
+	socklen_t client_addr_len;
+
 	// Структура с адресом и портом сервера
 	struct sockaddr_in server_addr = {};
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(PORT);
-	server_addr.sin_addr = (struct in_addr){htonl(LOCALHOST)};
+	// server_addr.sin_addr = (struct in_addr){htonl(LOCALHOST)};
 
 	// Входящий сокет
-	fd_t serv_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (serv_sock == -1) {
-		perror("Failed to open sock");
-		return 1;
+	fd_t serv_sock = create_bind_server_socket(&server_addr);
+	if (-1 == serv_sock) {
+		perror("Failed to create binded socket");
+		return -1;
 	}
-
-	// Соединение сокета с портом и адресом
-	if (bind(serv_sock, (struct sockaddr const *)&server_addr,
-		 sizeof(server_addr))) {
-		perror("Failed to bind socket");
-		close(serv_sock);
-		return 1;
-	}
-
-	// Создание очереди запросов на соединение
-	if (listen(serv_sock, 100)) {
-		perror("Listen failed");
-		close(serv_sock);
-		return 1;
-	}
-
-	// Структура с адресом и портом клиента
-	struct sockaddr_in client_addr;
-	socklen_t client_addr_len;
 
 	fd_t client_sock = accept(serv_sock, (struct sockaddr *)&client_addr,
 				  &client_addr_len);
@@ -57,22 +47,60 @@ int main()
 		close(serv_sock);
 		return 1;
 	}
+	print_client_info(&client_addr);
 
-	printf("Подключение от:%u:%u\n", client_addr.sin_addr.s_addr,
-	       ntohs(client_addr.sin_port));
-
-	if (read_cycle(client_sock) < 0) {
+	int read_cycle_bad = read_cycle(client_sock);
+	if (read_cycle_bad < 0) {
 		perror("Recv failed");
 		close(serv_sock);
 		close(client_sock);
 		return 1;
 	}
+
+	// Штатное завершение работы
 	puts("Клиент прервал соединение");
 	close(serv_sock);
 	close(client_sock);
-
-	putchar('\n');
 	return 0;
+}
+
+void print_client_info(struct sockaddr_in const * client)
+{
+	uint32_t const fsto = ntohl(client->sin_addr.s_addr) >> 24;
+	uint32_t const sndo = 0xFF & (ntohl(client->sin_addr.s_addr) >> 16);
+	uint32_t const trdo = 0xFF & (ntohl(client->sin_addr.s_addr) >> 8);
+	uint32_t const ftho = 0xFF & (ntohl(client->sin_addr.s_addr));
+
+	printf("Подключение от:");
+	printf("%u", fsto);
+	printf(".%u",sndo);
+	printf(".%u",trdo);
+	printf(".%u",ftho);
+
+	printf(":%u\n",ntohs(client->sin_port));
+}
+
+fd_t create_bind_server_socket(struct sockaddr_in const * ip_info)
+{
+	// Входящий сокет
+	fd_t serv_sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (serv_sock == -1)
+		return -1;
+
+	// Соединение сокета с портом и адресом
+	if (bind(serv_sock, (struct sockaddr const *)ip_info,
+		 sizeof(*ip_info))) {
+		close(serv_sock);
+		return -1;
+	}
+
+	// Создание очереди запросов на соединение
+	if (listen(serv_sock, 100)) {
+		close(serv_sock);
+		return -1;
+	}
+
+	return serv_sock;
 }
 
 int read_cycle(fd_t fd)
