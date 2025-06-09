@@ -56,27 +56,35 @@ int main()
 		return 1;
 	}
 
+	printf("Подключение от:%u:%u\n", client_addr.sin_addr.s_addr,
+	       ntohs(client_addr.sin_port));
+
 	do {
 		ssize_t recv_ret;
-		char buf[17];
-		buf[16] = '\0';
+		size_t buflen = 64;
+		char buf[buflen + 1];
+		buf[buflen] = '\0';
 
-		recv_ret = recv(client_sock, buf, 16, 0);
+		recv_ret = recv(client_sock, buf, buflen, 0);
 		if (recv_ret < 0) {
 			perror("Recv failed");
 			close(serv_sock);
 			close(client_sock);
 			return 1;
 		}
-		if(recv_ret == 0)
+		if (recv_ret == 0){
+			puts("Клиент прервал соединение");
 			break;
+		}
 		buf[recv_ret] = '\0';
 
-		printf("recv_ret = %ld;", recv_ret);
-		printf("%s|\n", buf);
+		// Вывод буфера
+		printf("%s", buf);
 	} while (true);
 
 	close(serv_sock);
 	close(client_sock);
+
+	putchar('\n');
 	return 0;
 }
