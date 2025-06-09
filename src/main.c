@@ -13,13 +13,13 @@
 typedef int fd_t;
 
 constexpr in_port_t PORT = 8789;
-// constexpr uint32_t LOCALHOST = (127 << 24) + 1;
+[[maybe_unused]] constexpr uint32_t LOCALHOST = (127 << 24) + 1;
 
 int read_cycle(fd_t fd);
 
 fd_t create_bind_server_socket(struct sockaddr_in const * ip_info);
 
-void print_client_info(struct sockaddr_in const * client);
+void print_sockaddr_in_info(struct sockaddr_in const * addr);
 
 int main()
 {
@@ -47,7 +47,7 @@ int main()
 		close(serv_sock);
 		return 1;
 	}
-	print_client_info(&client_addr);
+	print_sockaddr_in_info(&client_addr);
 
 	int read_cycle_bad = read_cycle(client_sock);
 	if (read_cycle_bad < 0) {
@@ -64,20 +64,16 @@ int main()
 	return 0;
 }
 
-void print_client_info(struct sockaddr_in const * client)
+void print_sockaddr_in_info(struct sockaddr_in const * addr)
 {
-	uint32_t const fsto = ntohl(client->sin_addr.s_addr) >> 24;
-	uint32_t const sndo = 0xFF & (ntohl(client->sin_addr.s_addr) >> 16);
-	uint32_t const trdo = 0xFF & (ntohl(client->sin_addr.s_addr) >> 8);
-	uint32_t const ftho = 0xFF & (ntohl(client->sin_addr.s_addr));
+	// 1-4 октеты
+	uint8_t const fsto = ntohl(addr->sin_addr.s_addr) >> 24;
+	uint8_t const sndo = 0xFF & (ntohl(addr->sin_addr.s_addr) >> 16);
+	uint8_t const trdo = 0xFF & (ntohl(addr->sin_addr.s_addr) >> 8);
+	uint8_t const ftho = 0xFF & (ntohl(addr->sin_addr.s_addr));
 
-	printf("Подключение от:");
-	printf("%u", fsto);
-	printf(".%u",sndo);
-	printf(".%u",trdo);
-	printf(".%u",ftho);
-
-	printf(":%u\n",ntohs(client->sin_port));
+	printf("Подключение от:%u.%u.%u.%u", fsto, sndo, trdo, ftho);
+	printf(":%u\n",ntohs(addr->sin_port));
 }
 
 fd_t create_bind_server_socket(struct sockaddr_in const * ip_info)
