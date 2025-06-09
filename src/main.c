@@ -14,6 +14,8 @@ typedef int fd_t;
 constexpr in_port_t PORT = 8789;
 constexpr uint32_t LOCALHOST = (127 << 24) + 1;
 
+int read_cycle(fd_t fd);
+
 int main()
 {
 	// Структура с адресом и портом сервера
@@ -59,32 +61,39 @@ int main()
 	printf("Подключение от:%u:%u\n", client_addr.sin_addr.s_addr,
 	       ntohs(client_addr.sin_port));
 
+	if (read_cycle(client_sock) < 0) {
+		perror("Recv failed");
+		close(serv_sock);
+		close(client_sock);
+		return 1;
+	}
+	puts("Клиент прервал соединение");
+	close(serv_sock);
+	close(client_sock);
+
+	putchar('\n');
+	return 0;
+}
+
+int read_cycle(fd_t fd)
+{
+	constexpr size_t buflen = 64;
+	char buf[buflen + 1];
+	buf[buflen] = '\0';
+
 	do {
 		ssize_t recv_ret;
-		size_t buflen = 64;
-		char buf[buflen + 1];
-		buf[buflen] = '\0';
 
-		recv_ret = recv(client_sock, buf, buflen, 0);
+		recv_ret = recv(fd, buf, buflen, 0);
 		if (recv_ret < 0) {
-			perror("Recv failed");
-			close(serv_sock);
-			close(client_sock);
 			return 1;
 		}
-		if (recv_ret == 0){
-			puts("Клиент прервал соединение");
-			break;
+		if (recv_ret == 0) {
+			return 0;
 		}
 		buf[recv_ret] = '\0';
 
 		// Вывод буфера
 		printf("%s", buf);
 	} while (true);
-
-	close(serv_sock);
-	close(client_sock);
-
-	putchar('\n');
-	return 0;
 }
