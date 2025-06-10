@@ -1,7 +1,9 @@
 #include "io.h"
 #include "socks.h"
+#include <assert.h>
 #include <malloc.h>
 #include <netinet/in.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -77,13 +79,25 @@ int main()
 	return 0;
 }
 
+ssize_t send_bad_request(fd_t fd)
+{
+	return send(fd, NOT_FOUND_RESPONSE, strlen(NOT_FOUND_RESPONSE), 0);
+}
+
 ssize_t handle_request(fd_t fd, char const * db_mem, char const * request)
 {
-	const char * subst = strstr (db_mem, request);
+	// Подстрока, начинающаяся с запроса
+	char const * subst = strstr(db_mem, request);
 	if (!subst)
-		return send(fd, NOT_FOUND_RESPONSE, strlen(NOT_FOUND_RESPONSE), 0);
+		return send_bad_request(fd);
 
-	return send(fd, subst, strlen(subst), 0);
+	char const * endw = strpbrk(subst, "\t ");
+	if (!endw)
+		return send_bad_request(fd);
+	ssize_t const word_len = endw - subst;
+	assert(word_len > 0);
+
+	return send(fd, subst, (size_t)word_len, 0);
 }
 
 int communication_cycle(fd_t fd, char const * db_mem)
@@ -94,18 +108,27 @@ int communication_cycle(fd_t fd, char const * db_mem)
 
 	do {
 		ssize_t recv_ret = recv(fd, buf, buflen, 0);
-		if (recv_ret > 0) {
-			buf[recv_ret] = '\0';
-			char * endl = strpbrk(buf, "\r\n");
-			if (endl)
-				*endl = '\0';
-
-			if (handle_request(fd, db_mem, buf) < 0)
-				return -1;
-			continue;
-		} else if (recv_ret == 0) {
-			return 0;
-		} else // if (recv_ret < 0)
+		if (recv_ret == 0) {
+			break;
+		} else if (recv_ret < 0)
 			return -1;
+		// else if (recv_ret > 0)
+
+		buf[recv_ret] = '\0';
+
+		// Зануление переноса строки
+		char * endl = strpbrk(buf, "\r\n");
+		if (endl)
+			*endl = '\0';
+
+		ssize_t sent_bytes = handle_request(fd, db_mem, buf);
+		if (sent_bytes > 0)
+			continue;
+		else if (sent_bytes == 0)
+			break;
+		// if error
+		return -1;
+
 	} while (true);
+	return 0;
 }
