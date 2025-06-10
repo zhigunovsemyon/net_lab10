@@ -20,7 +20,7 @@ typedef int fd_t;
 constexpr in_port_t PORT = 8789;
 [[maybe_unused]] constexpr uint32_t LOCALHOST = (127 << 24) + 1;
 
-int read_cycle(fd_t fd);
+int communication_cycle(fd_t fd);
 
 fd_t create_bind_server_socket(struct sockaddr_in const * ip_info);
 
@@ -54,8 +54,8 @@ int main()
 	}
 	print_sockaddr_in_info(&client_addr);
 
-	int read_cycle_bad = read_cycle(client_sock);
-	if (read_cycle_bad < 0) {
+	int communication_cycle_bad = communication_cycle(client_sock);
+	if (communication_cycle_bad < 0) {
 		perror("Recv failed");
 		close(serv_sock);
 		close(client_sock);
@@ -104,7 +104,7 @@ fd_t create_bind_server_socket(struct sockaddr_in const * ip_info)
 	return serv_sock;
 }
 
-int read_cycle(fd_t fd)
+int communication_cycle(fd_t fd)
 {
 	constexpr size_t buflen = 64;
 	char buf[buflen + 1];
