@@ -19,6 +19,7 @@
  */
 
 char const * DB_FILENAME = "list.txt";
+char const * NOT_FOUND_RESPONSE = "No such entry!\n";
 constexpr in_port_t PORT = 8789;
 [[maybe_unused]] constexpr uint32_t LOCALHOST = (127 << 24) + 1;
 
@@ -76,9 +77,13 @@ int main()
 	return 0;
 }
 
-int handle_request(fd_t fd, char const * db_mem)
+ssize_t handle_request(fd_t fd, char const * db_mem, char const * request)
 {
-	return (int)(send(fd, db_mem, strlen(db_mem), 0));
+	const char * subst = strstr (db_mem, request);
+	if (!subst)
+		return send(fd, NOT_FOUND_RESPONSE, strlen(NOT_FOUND_RESPONSE), 0);
+
+	return send(fd, subst, strlen(subst), 0);
 }
 
 int communication_cycle(fd_t fd, char const * db_mem)
@@ -91,7 +96,11 @@ int communication_cycle(fd_t fd, char const * db_mem)
 		ssize_t recv_ret = recv(fd, buf, buflen, 0);
 		if (recv_ret > 0) {
 			buf[recv_ret] = '\0';
-			if (handle_request(fd, db_mem) < 0)
+			char * endl = strpbrk(buf, "\r\n");
+			if (endl)
+				*endl = '\0';
+
+			if (handle_request(fd, db_mem, buf) < 0)
 				return -1;
 			continue;
 		} else if (recv_ret == 0) {
