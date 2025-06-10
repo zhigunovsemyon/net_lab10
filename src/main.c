@@ -35,7 +35,6 @@ int main()
 {
 	Entry const db[] = {
 		{"Вася", "7894561122"},
-		{"Дурачок", "012345678901234567890123456789012345678"},
 		{"Петя", "1234567788"},
 		{"Ваня", "1597534466"},
 		{nullptr, nullptr}
@@ -92,8 +91,7 @@ static inline ssize_t send_bad_request(fd_t fd)
 ssize_t handle_request(fd_t fd, Entry const * db, char const * request)
 {
 	constexpr size_t sendbuf_size = 40;
-	char sendbuf[sendbuf_size + 2];
-	sendbuf[sendbuf_size + 1] = '\0';
+	char sendbuf[sendbuf_size + 1] = {};
 
 	while (db->name && db->num){
 		if (strcmp(db->name,request)){
