@@ -24,8 +24,8 @@ void print_sockaddr_in_info(struct sockaddr_in const * addr);
 int main()
 {
 	// Структура с адресом и портом клиента
-	struct sockaddr_in client_addr;
-	socklen_t client_addr_len;
+	struct sockaddr_in client_addr = {};
+	socklen_t client_addr_len = sizeof(client_addr);
 
 	// Структура с адресом и портом сервера
 	struct sockaddr_in server_addr = {};
