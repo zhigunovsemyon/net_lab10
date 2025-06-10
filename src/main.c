@@ -1,3 +1,4 @@
+#include "socks.h"
 #include <netinet/in.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -14,17 +15,10 @@
 	- Ответ сервера: телефон, связанный с введе6нным ФИО.
  */
 
-// Файловый дескриптор
-typedef int fd_t;
-
 constexpr in_port_t PORT = 8789;
 [[maybe_unused]] constexpr uint32_t LOCALHOST = (127 << 24) + 1;
 
 int communication_cycle(fd_t fd);
-
-fd_t create_bind_server_socket(struct sockaddr_in const * ip_info);
-
-void print_sockaddr_in_info(struct sockaddr_in const * addr);
 
 int main()
 {
@@ -45,6 +39,7 @@ int main()
 		return -1;
 	}
 
+	printf("Ожидание соединения на порт %hu\n", PORT);
 	fd_t client_sock = accept(serv_sock, (struct sockaddr *)&client_addr,
 				  &client_addr_len);
 	if (client_sock < 0) {
@@ -67,41 +62,6 @@ int main()
 	close(serv_sock);
 	close(client_sock);
 	return 0;
-}
-
-void print_sockaddr_in_info(struct sockaddr_in const * addr)
-{
-	// 1-4 октеты
-	uint8_t const fsto = ntohl(addr->sin_addr.s_addr) >> 24;
-	uint8_t const sndo = 0xFF & (ntohl(addr->sin_addr.s_addr) >> 16);
-	uint8_t const trdo = 0xFF & (ntohl(addr->sin_addr.s_addr) >> 8);
-	uint8_t const ftho = 0xFF & (ntohl(addr->sin_addr.s_addr));
-
-	printf("Подключение от:%u.%u.%u.%u", fsto, sndo, trdo, ftho);
-	printf(":%u\n", ntohs(addr->sin_port));
-}
-
-fd_t create_bind_server_socket(struct sockaddr_in const * ip_info)
-{
-	// Входящий сокет
-	fd_t serv_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (serv_sock == -1)
-		return -1;
-
-	// Соединение сокета с портом и адресом
-	if (bind(serv_sock, (struct sockaddr const *)ip_info,
-		 sizeof(*ip_info))) {
-		close(serv_sock);
-		return -1;
-	}
-
-	// Создание очереди запросов на соединение
-	if (listen(serv_sock, 100)) {
-		close(serv_sock);
-		return -1;
-	}
-
-	return serv_sock;
 }
 
 int communication_cycle(fd_t fd)
