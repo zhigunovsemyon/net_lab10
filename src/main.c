@@ -1,4 +1,3 @@
-#include "io.h"
 #include "socks.h"
 #include <assert.h>
 #include <malloc.h>
@@ -20,15 +19,27 @@
 	- Ответ сервера: телефон, связанный с введённым ФИО.
  */
 
-char const * DB_FILENAME = "list.txt";
+// Последняя запись должна содержать null поля
+typedef struct {
+	const char * name;
+	const char * num;
+} Entry;
+
 char const * NOT_FOUND_RESPONSE = "No such entry!\n";
 constexpr in_port_t PORT = 8789;
 [[maybe_unused]] constexpr uint32_t LOCALHOST = (127 << 24) + 1;
 
-int communication_cycle(fd_t fd, char const * db_mem);
+int communication_cycle(fd_t fd, Entry const * db);
 
 int main()
 {
+	Entry const db[] = {
+		{"Вася", "7894561122"},
+		{"Дурачок", "012345678901234567890123456789012345678"},
+		{"Петя", "1234567788"},
+		{"Ваня", "1597534466"},
+		{nullptr, nullptr}
+	};
 	// Структура с адресом и портом клиента
 	struct sockaddr_in client_addr = {};
 	socklen_t client_addr_len = sizeof(client_addr);
@@ -38,13 +49,7 @@ int main()
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(PORT);
 	// server_addr.sin_addr = (struct in_addr){htonl(LOCALHOST)};
-
-	// Открытие и чтение базы данных
-	char * db_copy = read_db_from_file(DB_FILENAME);
-	if (!db_copy) {
-		perror("Failed to open db!");
-		return -1;
-	}
+	server_addr.sin_addr = (struct in_addr){htonl(0)};
 
 	// Входящий сокет
 	fd_t serv_sock = create_bind_server_socket(&server_addr);
@@ -63,7 +68,7 @@ int main()
 	}
 	print_sockaddr_in_info(&client_addr);
 
-	int communication_cycle_bad = communication_cycle(client_sock, db_copy);
+	int communication_cycle_bad = communication_cycle(client_sock, db);
 	if (communication_cycle_bad < 0) {
 		perror("Recv failed");
 		close(serv_sock);
@@ -75,32 +80,36 @@ int main()
 	puts("Клиент прервал соединение");
 	close(serv_sock);
 	close(client_sock);
-	free(db_copy);
+	// free(db_copy);
 	return 0;
 }
 
-ssize_t send_bad_request(fd_t fd)
+static inline ssize_t send_bad_request(fd_t fd)
 {
 	return send(fd, NOT_FOUND_RESPONSE, strlen(NOT_FOUND_RESPONSE), 0);
 }
 
-ssize_t handle_request(fd_t fd, char const * db_mem, char const * request)
+ssize_t handle_request(fd_t fd, Entry const * db, char const * request)
 {
-	// Подстрока, начинающаяся с запроса
-	char const * subst = strstr(db_mem, request);
-	if (!subst)
-		return send_bad_request(fd);
+	constexpr size_t sendbuf_size = 40;
+	char sendbuf[sendbuf_size + 2];
+	sendbuf[sendbuf_size + 1] = '\0';
 
-	char const * endw = strpbrk(subst, "\t ");
-	if (!endw)
-		return send_bad_request(fd);
-	ssize_t const word_len = endw - subst;
-	assert(word_len > 0);
+	while (db->name && db->num){
+		if (strcmp(db->name,request)){
+			db++;
+			continue;
+		}
 
-	return send(fd, subst, (size_t)word_len, 0);
+		strncpy(sendbuf, db->num, sendbuf_size);
+		sendbuf[strlen(sendbuf)] = '\n';
+		return send(fd,sendbuf, strlen(sendbuf), 0);
+	}
+
+	return send_bad_request(fd);
 }
 
-int communication_cycle(fd_t fd, char const * db_mem)
+int communication_cycle(fd_t fd, Entry const * db)
 {
 	constexpr size_t buflen = 64;
 	char buf[buflen + 1];
@@ -112,8 +121,8 @@ int communication_cycle(fd_t fd, char const * db_mem)
 			break;
 		} else if (recv_ret < 0)
 			return -1;
-		// else if (recv_ret > 0)
 
+		// else if (recv_ret > 0)
 		buf[recv_ret] = '\0';
 
 		// Зануление переноса строки
@@ -121,7 +130,7 @@ int communication_cycle(fd_t fd, char const * db_mem)
 		if (endl)
 			*endl = '\0';
 
-		ssize_t sent_bytes = handle_request(fd, db_mem, buf);
+		ssize_t sent_bytes = handle_request(fd, db, buf);
 		if (sent_bytes > 0)
 			continue;
 		else if (sent_bytes == 0)
